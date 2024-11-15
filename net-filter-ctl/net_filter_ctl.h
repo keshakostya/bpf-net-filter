@@ -6,8 +6,9 @@
 #include <linux/in.h>
 #include <xdp/libxdp.h>
 
-#define NET_FILTER_PROGRAM_NAME    "net_filter_xdp.o"
+#define NET_FILTER_PROGRAM_FILE    "net_filter_xdp.o"
 #define NET_FILTER_PROGRAM_SECTION "net_filter_xdp"
+#define NET_FILTER_PROGRAM_NAME    "net_filter_xdp_prog"
 
 enum net_filter_mode
 {
@@ -31,6 +32,8 @@ struct net_filter_md
 };
 
 #define NET_FILTER_ACL_MAX_SIZE 16
+#define NET_FILTER_ACE_MAX_FIELDS 8
+#define NET_FILTER_ACE_MAX_FIELD_LEN 100
 
 enum net_filter_action
 {
@@ -40,18 +43,22 @@ enum net_filter_action
   NET_FILTER_ACTION_END,
 };
 
-#define NET_FILTER_ACE_SIP        (1 << 0)
-#define NET_FILTER_ACE_DIP        (1 << 1)
-#define NET_FILTER_ACE_PROTOCOL   (1 << 2)
-#define NET_FILTER_ACE_SPORT      (1 << 3)
-#define NET_FILTER_ACE_DPORT      (1 << 4)
-#define NET_FILTER_ACE_ICMP_TYPE  (1 << 5)
-#define NET_FILTER_ACE_ICMP_CODE  (1 << 6)
+#define NET_FILTER_ACE_SIP (1 << 0)
+#define NET_FILTER_ACE_SIP_MASK (1 << 1)
+#define NET_FILTER_ACE_DIP (1 << 2)
+#define NET_FILTER_ACE_DIP_MASK (1 << 3)
+#define NET_FILTER_ACE_PROTOCOL (1 << 4)
+#define NET_FILTER_ACE_SPORT (1 << 5)
+#define NET_FILTER_ACE_DPORT (1 << 6)
+#define NET_FILTER_ACE_ICMP_TYPE (1 << 7)
+#define NET_FILTER_ACE_ICMP_CODE (1 << 8)
 struct net_filter_ace
 {
   u_int32_t flags;
   struct in_addr sip;
+  struct in_addr sip_mask;
   struct in_addr dip;
+  struct in_addr dip_mask;
 
   u_int8_t protocol;
   u_int16_t sport;
@@ -66,4 +73,7 @@ struct net_filter_ace
 int net_filter_ctl_start(struct net_filter_options *opt);
 int net_filter_ctl_stop(struct net_filter_options *opt);
 
+int net_filter_parse_acl_file(struct net_filter_options *opts,
+                              struct net_filter_ace acl[],
+                              int *ace_count);
 #endif /* __NET_FILTER_CTL_H__ */
