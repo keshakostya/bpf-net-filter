@@ -17,3 +17,10 @@ net_filter_ctl:
 post_build:
 	cp $(NET_FILTER_CTL_DIR)/$(BUILD_DIR)/net_filter_ctl $(TARGET_DIR)
 	cp $(NET_FILTER_XDP_DIR)/$(BUILD_DIR)/net_filter_xdp.o $(TARGET_DIR)
+	cp $(TARGET_DIR)/* .
+
+clean:
+	$(MAKE) -C $(NET_FILTER_XDP_DIR) clean
+	$(MAKE) -C $(NET_FILTER_CTL_DIR) clean
+	rm net_filter_ctl net_filter_xdp.o
+	rm -rf $(TARGET_DIR)
