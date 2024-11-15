@@ -7,6 +7,33 @@
 #include <linux/udp.h>
 #include <linux/icmp.h>
 
+#define NET_FILTER_ACE_SIP (1 << 0)
+#define NET_FILTER_ACE_SIP_MASK (1 << 1)
+#define NET_FILTER_ACE_DIP (1 << 2)
+#define NET_FILTER_ACE_DIP_MASK (1 << 3)
+#define NET_FILTER_ACE_PROTOCOL (1 << 4)
+#define NET_FILTER_ACE_SPORT (1 << 5)
+#define NET_FILTER_ACE_DPORT (1 << 6)
+#define NET_FILTER_ACE_ICMP_TYPE (1 << 7)
+#define NET_FILTER_ACE_ICMP_CODE (1 << 8)
+struct net_filter_ace
+{
+  u_int32_t flags;
+  struct in_addr sip;
+  struct in_addr sip_mask;
+  struct in_addr dip;
+  struct in_addr dip_mask;
+
+  u_int8_t protocol;
+  u_int16_t sport;
+  u_int16_t dport;
+
+  u_int8_t icmp_type;
+  u_int8_t icmp_code;
+
+  u_int8_t action;
+};
+
 #undef AF_INET
 #define AF_INET 2
 

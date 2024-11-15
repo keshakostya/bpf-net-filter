@@ -14,6 +14,13 @@
 #define memcpy(dest, src, n) __builtin_memcpy((dest), (src), (n))
 #endif
 
+struct {
+    __uint(type, BPF_MAP_TYPE_ARRAY);
+    __type(key, __u32);
+    __type(value, struct net_filter_ace);
+    __uint(max_entries, 16);
+} acl_map SEC(".maps");
+
 int parse_packet(struct hdr_cursor *hdr,
                  struct net_packet *pkt)
 {
