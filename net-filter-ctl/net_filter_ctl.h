@@ -10,6 +10,9 @@
 #define NET_FILTER_PROGRAM_SECTION "net_filter_xdp"
 #define NET_FILTER_PROGRAM_NAME    "net_filter_xdp_prog"
 
+#define NET_FILTER_BASE_MAP_DIR "/sys/fs/bpf"
+#define NET_FILTER_ACL_MAP_NAME "acl_map"
+
 enum net_filter_mode
 {
   NET_FILTER_MODE_NONE = 0,
@@ -76,4 +79,9 @@ int net_filter_ctl_stop(struct net_filter_options *opt);
 int net_filter_parse_acl_file(struct net_filter_options *opts,
                               struct net_filter_ace acl[],
                               int *ace_count);
+int net_filter_open_map(const char *map_pin_path,
+                        struct bpf_map_info *map_info);
+char *net_filter_construct_map_name(const char *base_dir,
+                                    const char *ifname,
+                                    const char *map_name);
 #endif /* __NET_FILTER_CTL_H__ */
