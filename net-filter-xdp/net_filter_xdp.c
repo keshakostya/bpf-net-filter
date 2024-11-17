@@ -94,6 +94,33 @@ int redirect_packet(struct xdp_md *ctx, struct net_packet *pkt)
   return XDP_PASS;
 }
 
+int get_packet_desicion(struct net_packet *pkt)
+{
+  struct net_filter_ace *ace = NULL;
+  int i = 0;
+  int found = 0;
+
+#pragma unroll
+  for (i = 0; i < 16; ++i)
+  {
+    ace = bpf_map_lookup_elem(&acl_map, &i);
+    if (!ace)
+      continue;
+
+    if (ace->sip.s_addr == pkt->ipv4->addrs.saddr & ace->sip_mask.s_addr)
+    {
+      found = 1;
+    }
+
+    if (found)
+    {
+      return ace->action == NET_FILTER_ACTION_PERMIT ? XDP_PASS : XDP_DROP;
+    }
+  }
+
+  return XDP_DROP;
+}
+
 SEC("net_filter_xdp")
 int net_filter_xdp_prog(struct xdp_md *ctx)
 {
@@ -102,13 +129,18 @@ int net_filter_xdp_prog(struct xdp_md *ctx)
   struct net_packet pkt = {};
   struct hdr_cursor hdr = {.pos = data, .end = data_end};
   int ret;
+  int action;
 
   ret = parse_packet(&hdr, &pkt);
   if (ret < 0)
   {
     bpf_printk("Parse packet error (%d)\n", ret);
-    return XDP_DROP;
+    return XDP_PASS;
   }
+
+  action = get_packet_desicion(&pkt);
+  if (action == XDP_DROP)
+    return XDP_DROP;
 
   return redirect_packet(ctx, &pkt);
 }

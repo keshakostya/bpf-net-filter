@@ -7,6 +7,14 @@
 #include <linux/udp.h>
 #include <linux/icmp.h>
 
+enum net_filter_action
+{
+  NET_FILTER_ACTION_NONE = 0,
+  NET_FILTER_ACTION_PERMIT,
+  NET_FILTER_ACTION_DENY,
+  NET_FILTER_ACTION_END,
+};
+
 #define NET_FILTER_ACE_SIP (1 << 0)
 #define NET_FILTER_ACE_SIP_MASK (1 << 1)
 #define NET_FILTER_ACE_DIP (1 << 2)
