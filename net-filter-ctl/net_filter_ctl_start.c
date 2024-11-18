@@ -29,8 +29,10 @@ int net_filter_ctl_start(struct net_filter_options *opts)
     return ret;
   }
 
+  // char *map_name = net_filter_construct_map_name(NET_FILTER_BASE_MAP_DIR, opts->ifname, "acl_map");
+
   bpf_obj = xdp_program__bpf_obj(prog);
-  ret = bpf_object__pin_maps(bpf_obj, "/sys/fs/bpf/ens160");
+  ret = bpf_object__pin_maps(bpf_obj, NET_FILTER_BASE_MAP_DIR"/ens256");
 	if (ret)
 		return -1;
 

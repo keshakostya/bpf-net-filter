@@ -100,7 +100,7 @@ int get_packet_desicion(struct net_packet *pkt)
   int i = 0;
   int found = 0;
 
-#pragma unroll
+#pragma unroll(16)
   for (i = 0; i < 16; ++i)
   {
     ace = bpf_map_lookup_elem(&acl_map, &i);
@@ -138,9 +138,9 @@ int net_filter_xdp_prog(struct xdp_md *ctx)
     return XDP_PASS;
   }
 
-  action = get_packet_desicion(&pkt);
-  if (action == XDP_DROP)
-    return XDP_DROP;
+  // action = get_packet_desicion(&pkt);
+  // if (action == XDP_DROP)
+  //   return XDP_DROP;
 
   return redirect_packet(ctx, &pkt);
 }
