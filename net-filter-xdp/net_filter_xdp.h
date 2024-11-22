@@ -52,6 +52,7 @@ enum error_e {
   PKT_PARSE_TTL_END,
   PKT_PARSE_L3_PROTO_UNSUPPORTED,
   PKT_PARSE_L4_PROTO_UNSUPPORTED,
+  PKT_PARSE_PASS_TO_KERNEL,
 };
 
 struct hdr_cursor
@@ -66,12 +67,11 @@ struct net_packet
   struct ethhdr *eth;
 
   /* l3 info */
-  struct iphdr *ipv4; // TODO: add ipv6 support
+  struct iphdr *ipv4;
 
   /* l4 info */
   struct l4hdr
   {
-    __u8 protocol;
     union
     {
       struct icmphdr *icmp;
@@ -95,10 +95,10 @@ static __always_inline int parse_ethhdr(struct hdr_cursor *hdr,
   struct ethhdr *eth_p = hdr->pos;
 
   if (hdr->pos + sizeof(struct ethhdr) > hdr->end)
+  {
+    bpf_printk("len eth hdr error\n");
     return PKT_PARSE_HDR_BAD;
-
-  if (eth_p->h_proto != bpf_htons(ETH_P_IP))
-    return PKT_PARSE_L3_PROTO_UNSUPPORTED;
+  }
 
   hdr->pos = eth_p + 1;
   *eth = eth_p;

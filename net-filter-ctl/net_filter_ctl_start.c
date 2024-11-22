@@ -10,6 +10,7 @@ int net_filter_ctl_start(struct net_filter_options *opts)
   int ret, ifindex, map_fd;
   struct xdp_program *prog;
   struct bpf_object *bpf_obj;
+  char map_dir[PATH_MAX];
 
   ifindex = if_nametoindex(opts->ifname);
   if (ifindex == 0)
@@ -31,8 +32,9 @@ int net_filter_ctl_start(struct net_filter_options *opts)
 
   // char *map_name = net_filter_construct_map_name(NET_FILTER_BASE_MAP_DIR, opts->ifname, "acl_map");
 
+  snprintf(map_dir, PATH_MAX, "%s/%s", NET_FILTER_BASE_MAP_DIR, opts->ifname);
   bpf_obj = xdp_program__bpf_obj(prog);
-  ret = bpf_object__pin_maps(bpf_obj, NET_FILTER_BASE_MAP_DIR"/ens256");
+  ret = bpf_object__pin_maps(bpf_obj, map_dir);
 	if (ret)
 		return -1;
 

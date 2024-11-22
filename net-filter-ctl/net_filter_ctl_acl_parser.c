@@ -104,6 +104,18 @@ int net_filter_parse_ace_field(char *field_name, char *field_value,
                                NET_FILTER_ICMP_CODE_MAX);
     ace->flags |= NET_FILTER_ACE_ICMP_CODE;
   }
+  else if (strncmp(field_name, "action", FIELD_NAME_SIZE) == 0)
+  {
+    if (strncmp(field_value, "deny", sizeof("deny") - 1) == 0)
+      ace->action = NET_FILTER_ACTION_DENY;
+    else if (strncmp(field_value, "permit", sizeof("permit") - 1) == 0)
+      ace->action = NET_FILTER_ACTION_PERMIT;
+    else
+    {
+      fprintf(stderr, "Unkown action %s\n", field_value);
+      return 1;
+    }
+  }
   else
   {
     fprintf(stderr, "Unknown ace field %s\n", field_name);

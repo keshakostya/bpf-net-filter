@@ -15,6 +15,7 @@ int net_filter_ctl_stop(struct net_filter_options *opts)
   int mode = 0;
   int ret;
   struct bpf_object *bpf_obj;
+  char map_dir[PATH_MAX];
 
   ifindex = if_nametoindex(opts->ifname);
   if (!ifindex)
@@ -30,7 +31,13 @@ int net_filter_ctl_stop(struct net_filter_options *opts)
   }
   
   bpf_obj = xdp_program__bpf_obj(prog);
-  ret = bpf_object__unpin_maps(bpf_obj, "/sys/fs/bpf/ens160");
+  snprintf(map_dir, PATH_MAX, "%s/%s", NET_FILTER_BASE_MAP_DIR, opts->ifname);
+  ret = bpf_object__unpin_maps(bpf_obj, map_dir);
+  if (ret)
+  {
+    fprintf(stderr, "Fail to unpin maps\n");
+    goto out;
+  }
 
   mp = xdp_multiprog__get_from_ifindex(ifindex);
   if (!mp)
@@ -71,6 +78,7 @@ int net_filter_ctl_stop(struct net_filter_options *opts)
 		goto found;
 	}
 found:
+  printf("detach program %s\n", xdp_program__name(prog));
   xdp_program__detach(prog, ifindex, mode, 0);
 out:
   xdp_multiprog__close(mp);
