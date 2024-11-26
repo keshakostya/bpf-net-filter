@@ -1,19 +1,17 @@
-#ifndef __NET_FILTER_H__
-#define __NET_FILTER_H__
+#ifndef __XDP_KERN_H__
+#define __XDP_KERN_H__
 
+#include <bpf/bpf_endian.h>
+#include <linux/icmp.h>
 #include <linux/if_ether.h>
 #include <linux/ip.h>
 #include <linux/tcp.h>
 #include <linux/udp.h>
-#include <linux/icmp.h>
 
-enum net_filter_action
-{
-  NET_FILTER_ACTION_NONE = 0,
-  NET_FILTER_ACTION_PERMIT,
-  NET_FILTER_ACTION_DENY,
-  NET_FILTER_ACTION_END,
-};
+#define CHECK_FLAG(v, f) ((v) & (f))
+
+#define ACL_SIZE 16
+struct net_filter_ace {
 
 #define NET_FILTER_ACE_SIP (1 << 0)
 #define NET_FILTER_ACE_SIP_MASK (1 << 1)
@@ -24,13 +22,12 @@ enum net_filter_action
 #define NET_FILTER_ACE_DPORT (1 << 6)
 #define NET_FILTER_ACE_ICMP_TYPE (1 << 7)
 #define NET_FILTER_ACE_ICMP_CODE (1 << 8)
-struct net_filter_ace
-{
   u_int32_t flags;
-  struct in_addr sip;
-  struct in_addr sip_mask;
-  struct in_addr dip;
-  struct in_addr dip_mask;
+
+  unsigned int sip;
+  unsigned int sip_mask;
+  unsigned int dip;
+  unsigned int dip_mask;
 
   u_int8_t protocol;
   u_int16_t sport;
@@ -42,137 +39,163 @@ struct net_filter_ace
   u_int8_t action;
 };
 
-#undef AF_INET
-#define AF_INET 2
-
-enum error_e {
-  PKT_PARSE_SUCCESS     = 0,
-  PKT_PARSE_HDR_UNKNOWN = -1000,
-  PKT_PARSE_HDR_BAD,
-  PKT_PARSE_TTL_END,
-  PKT_PARSE_L3_PROTO_UNSUPPORTED,
-  PKT_PARSE_L4_PROTO_UNSUPPORTED,
-  PKT_PARSE_PASS_TO_KERNEL,
+struct pkt_cursor
+{
+  void* pos;
+  void* end;
 };
 
-struct hdr_cursor
+struct pkt_info
 {
-  void *pos;
-  void *end;
+  unsigned int saddr;
+  unsigned int daddr;
+
+  unsigned char protocol;
+  unsigned char source;
+  unsigned char dest;
+
+  unsigned char icmp_type;
+  unsigned char icmp_code;
 };
 
-struct net_packet
+#define PARSE_PKT_ERR_OK 0
+#define PARSE_PKT_ERR_UNSUPPORTED -1
+#define PARSE_PKT_ERR_HDR_BAD -2
+
+/* Parse ethernet header and retern ethertype */
+static __always_inline int
+parse_ethhdr(struct pkt_cursor* crs)
 {
-  /* l2 info */
-  struct ethhdr *eth;
+  struct ethhdr* eth_p = crs->pos;
 
-  /* l3 info */
-  struct iphdr *ipv4;
+  if (crs->pos + sizeof(struct ethhdr) > crs->end)
+    return PARSE_PKT_ERR_HDR_BAD;
 
-  /* l4 info */
-  struct l4hdr
-  {
-    union
-    {
-      struct icmphdr *icmp;
-      struct tcphdr *tcp;
-      struct udphdr *udp;
-    };
-  } l4hdr;
-};
+  if (eth_p->h_proto != bpf_htons(ETH_P_IP))
+    return PARSE_PKT_ERR_UNSUPPORTED;
 
-static __always_inline int ip_decrease_ttl(struct iphdr *iph)
-{
-	__u32 check = iph->check;
-	check += bpf_htons(0x0100);
-	iph->check = (__u16)(check + (check >= 0xFFFF));
-	return --iph->ttl;
+  crs->pos = eth_p + 1;
+  return PARSE_PKT_ERR_OK;
 }
 
-static __always_inline int parse_ethhdr(struct hdr_cursor *hdr,
-                                        struct ethhdr **eth)
+static __always_inline int
+parse_iphdr(struct pkt_cursor* crs, struct pkt_info* pkt_info)
 {
-  struct ethhdr *eth_p = hdr->pos;
-
-  if (hdr->pos + sizeof(struct ethhdr) > hdr->end)
-  {
-    bpf_printk("len eth hdr error\n");
-    return PKT_PARSE_HDR_BAD;
-  }
-
-  hdr->pos = eth_p + 1;
-  *eth = eth_p;
-  return PKT_PARSE_SUCCESS;
-}
-
-static __always_inline int parse_iphdr(struct hdr_cursor *hdr,
-                                       struct iphdr **ip)
-{
-  struct iphdr *ip_p = hdr->pos;
+  struct iphdr* ip_p = crs->pos;
   int hdrsize;
 
-  if (hdr->pos + sizeof(struct iphdr) > hdr->end)
-    return PKT_PARSE_HDR_BAD;
+  if (crs->pos + sizeof(struct iphdr) > crs->end)
+    return PARSE_PKT_ERR_HDR_BAD;
 
   hdrsize = ip_p->ihl * 4;
-  if (hdr->pos + hdrsize > hdr->end)
-    return PKT_PARSE_HDR_BAD;
+  if (crs->pos + hdrsize > crs->end)
+    return PARSE_PKT_ERR_HDR_BAD;
 
-  if (ip_p->ttl <= 1)
-    return PKT_PARSE_TTL_END;
+  pkt_info->protocol = ip_p->protocol;
+  pkt_info->saddr = ip_p->saddr;
+  pkt_info->daddr = ip_p->daddr;
 
-  hdr->pos = ip_p + 1;
-  *ip = ip_p;
-  return PKT_PARSE_SUCCESS;
+  crs->pos = ip_p + 1;
+  return PARSE_PKT_ERR_OK;
 }
 
-static __always_inline int parse_tcphdr(struct hdr_cursor *hdr,
-                                        struct tcphdr **tcp)
+static __always_inline int
+parse_tcphdr(struct pkt_cursor* crs, struct pkt_info* pkt_info)
 {
-  struct tcphdr *tcp_p = hdr->pos;
+  struct tcphdr* tcp_p = crs->pos;
   int hdrsize;
 
-  if (hdr->pos + sizeof(struct tcphdr) > hdr->end)
-    return PKT_PARSE_HDR_BAD;
+  if (crs->pos + sizeof(struct tcphdr) > crs->end)
+    return PARSE_PKT_ERR_HDR_BAD;
 
   hdrsize = tcp_p->doff * 4;
-  if (hdr->pos + hdrsize > hdr->end)
-    return PKT_PARSE_HDR_BAD;
+  if (crs->pos + hdrsize > crs->end)
+    return PARSE_PKT_ERR_HDR_BAD;
 
-  hdr->pos = tcp_p + 1;
-  *tcp = tcp_p;
-  return PKT_PARSE_SUCCESS;
+  pkt_info->source = tcp_p->source;
+  pkt_info->dest = tcp_p->dest;
+
+  crs->pos = tcp_p + 1;
+  return PARSE_PKT_ERR_OK;
 }
 
-static __always_inline int parse_udphdr(struct hdr_cursor *hdr,
-                                        struct udphdr **udp)
+static __always_inline int
+parse_udphdr(struct pkt_cursor* crs, struct pkt_info* pkt_info)
 {
-  struct udphdr *udp_p = hdr->pos;
-  int len;
+  struct udphdr* udp_p = crs->pos;
+  int hdrsize;
 
-  if (hdr->pos + sizeof(struct udphdr) > hdr->end)
-    return PKT_PARSE_HDR_BAD;
+  if (crs->pos + sizeof(struct tcphdr) > crs->end)
+    return PARSE_PKT_ERR_HDR_BAD;
 
-  len = bpf_ntohs(udp_p->len) - sizeof(struct udphdr);
-  if (len < 0)
-    return PKT_PARSE_HDR_BAD;
+  hdrsize = bpf_ntohs(udp_p->len) - sizeof(struct udphdr);
+  if (hdrsize < 0)
+    return PARSE_PKT_ERR_HDR_BAD;
 
-  hdr->pos = udp_p + 1;
-  *udp = udp_p;
-  return PKT_PARSE_SUCCESS;
+  pkt_info->source = udp_p->source;
+  pkt_info->dest = udp_p->dest;
+
+  crs->pos = udp_p + 1;
+  return PARSE_PKT_ERR_OK;
 }
 
-static __always_inline int parse_icmphdr(struct hdr_cursor *hdr,
-                                         struct icmphdr **icmphdr)
+static __always_inline int
+parse_icmphdr(struct pkt_cursor* crs, struct pkt_info *pkt_info)
 {
-  struct icmphdr *icmp = hdr->pos;
+  struct icmphdr* icmp_p = crs->pos;
 
-  if (hdr->pos + sizeof(struct icmphdr) > hdr->end)
-    return PKT_PARSE_HDR_BAD;
+  if (crs->pos + sizeof(struct icmphdr) > crs->end)
+    return PARSE_PKT_ERR_HDR_BAD;
 
-  hdr->pos = icmp + 1;
-  *icmphdr = icmp;
-  return PKT_PARSE_SUCCESS;
+  pkt_info->icmp_code = icmp_p->code;
+  pkt_info->icmp_type = icmp_p->type;
+
+  crs->pos = icmp_p + 1;
+  return PARSE_PKT_ERR_OK;
 }
 
-#endif /* __NET_FILTER_H__ */
+#define IPV4_COMPARE_BY_MASK(addr1, addr2, mask) ((addr1) == ((addr2) & (mask)))
+
+static __always_inline int
+get_packet_verdict(struct pkt_info *pkt_info, struct net_filter_ace *ace)
+{
+  if (!pkt_info || !ace)
+    return 0;
+
+  if (ace->flags == 0)
+    return 0;
+
+  if (CHECK_FLAG(ace->flags, NET_FILTER_ACE_SIP))
+  {
+    if (!IPV4_COMPARE_BY_MASK(ace->sip, pkt_info->saddr, ace->sip_mask))
+      return 0;
+  }
+
+  if (CHECK_FLAG(ace->flags, NET_FILTER_ACE_DIP))
+  {
+    if (!IPV4_COMPARE_BY_MASK(ace->dip, pkt_info->daddr, ace->dip_mask))
+      return 0;
+  }
+
+  if (CHECK_FLAG(ace->flags, NET_FILTER_ACE_PROTOCOL))
+  {
+    if (ace->protocol != pkt_info->protocol)
+      return 0;
+  }
+
+  if (CHECK_FLAG(ace->flags, NET_FILTER_ACE_SPORT))
+  {
+    if (ace->sport != pkt_info->source)
+      return 0;
+  }
+  
+  if (CHECK_FLAG(ace->flags, NET_FILTER_ACE_DPORT))
+  {
+    if (ace->dport != pkt_info->dest)
+      return 0;
+  }
+
+  return 1;
+}
+
+#endif /* __XDP_KERN_H__ */
