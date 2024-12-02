@@ -31,7 +31,7 @@ int net_filter_ctl_stop(struct net_filter_options *opts)
   }
   
   bpf_obj = xdp_program__bpf_obj(prog);
-  snprintf(map_dir, PATH_MAX, "%s/%s", NET_FILTER_BASE_MAP_DIR, opts->ifname);
+  snprintf(map_dir, PATH_MAX, "%s/%s/", NET_FILTER_BASE_MAP_DIR, opts->ifname);
   ret = bpf_object__unpin_maps(bpf_obj, map_dir);
   if (ret)
   {

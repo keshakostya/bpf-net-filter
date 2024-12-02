@@ -149,6 +149,12 @@ int net_filter_parse_ace(int ace_num, struct net_filter_ace *ace)
       return ret;
   }
 
+  if ((ace->flags & NET_FILTER_ACE_SIP) && !(ace->flags & NET_FILTER_ACE_SIP_MASK))
+    ace->sip_mask.s_addr = 2^32 - 1;
+
+  if ((ace->flags & NET_FILTER_ACE_DIP) && !(ace->flags & NET_FILTER_ACE_DIP_MASK))
+    ace->sip_mask.s_addr = 2^32 - 1;
+
   return 0;
 }
 
