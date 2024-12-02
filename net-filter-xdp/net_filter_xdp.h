@@ -51,8 +51,8 @@ struct pkt_info
   unsigned int daddr;
 
   unsigned char protocol;
-  unsigned char source;
-  unsigned char dest;
+  unsigned short source;
+  unsigned short dest;
 
   unsigned char icmp_type;
   unsigned char icmp_code;
@@ -74,7 +74,7 @@ parse_ethhdr(struct pkt_cursor* crs)
   if (eth_p->h_proto != bpf_htons(ETH_P_IP))
     return PARSE_PKT_ERR_UNSUPPORTED;
 
-  crs->pos = eth_p + 1;
+  crs->pos += sizeof(struct ethhdr);
   return PARSE_PKT_ERR_OK;
 }
 
@@ -95,7 +95,7 @@ parse_iphdr(struct pkt_cursor* crs, struct pkt_info* pkt_info)
   pkt_info->saddr = ip_p->saddr;
   pkt_info->daddr = ip_p->daddr;
 
-  crs->pos = ip_p + 1;
+  crs->pos += sizeof(struct iphdr);
   return PARSE_PKT_ERR_OK;
 }
 
@@ -115,7 +115,7 @@ parse_tcphdr(struct pkt_cursor* crs, struct pkt_info* pkt_info)
   pkt_info->source = tcp_p->source;
   pkt_info->dest = tcp_p->dest;
 
-  crs->pos = tcp_p + 1;
+  crs->pos += sizeof(struct tcphdr);
   return PARSE_PKT_ERR_OK;
 }
 
@@ -125,7 +125,7 @@ parse_udphdr(struct pkt_cursor* crs, struct pkt_info* pkt_info)
   struct udphdr* udp_p = crs->pos;
   int hdrsize;
 
-  if (crs->pos + sizeof(struct tcphdr) > crs->end)
+  if (crs->pos + sizeof(struct udphdr) > crs->end)
     return PARSE_PKT_ERR_HDR_BAD;
 
   hdrsize = bpf_ntohs(udp_p->len) - sizeof(struct udphdr);
@@ -135,7 +135,7 @@ parse_udphdr(struct pkt_cursor* crs, struct pkt_info* pkt_info)
   pkt_info->source = udp_p->source;
   pkt_info->dest = udp_p->dest;
 
-  crs->pos = udp_p + 1;
+  crs->pos += sizeof(struct udphdr);
   return PARSE_PKT_ERR_OK;
 }
 
@@ -150,7 +150,7 @@ parse_icmphdr(struct pkt_cursor* crs, struct pkt_info *pkt_info)
   pkt_info->icmp_code = icmp_p->code;
   pkt_info->icmp_type = icmp_p->type;
 
-  crs->pos = icmp_p + 1;
+  crs->pos += sizeof(struct icmphdr);
   return PARSE_PKT_ERR_OK;
 }
 
@@ -185,13 +185,13 @@ get_packet_verdict(struct pkt_info *pkt_info, struct net_filter_ace *ace)
 
   if (CHECK_FLAG(ace->flags, NET_FILTER_ACE_SPORT))
   {
-    if (ace->sport != pkt_info->source)
+    if (bpf_htons(ace->sport) != pkt_info->source)
       return 0;
   }
   
   if (CHECK_FLAG(ace->flags, NET_FILTER_ACE_DPORT))
   {
-    if (ace->dport != pkt_info->dest)
+    if (bpf_htons(ace->dport) != pkt_info->dest)
       return 0;
   }
 

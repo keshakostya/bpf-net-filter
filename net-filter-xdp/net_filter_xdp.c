@@ -135,7 +135,7 @@ net_filter_xdp_prog(struct xdp_md* ctx)
   if (ret == PARSE_PKT_ERR_UNSUPPORTED)
     return ACTION_DEFAULT;
 
-  return XDP_PASS;
+  return get_packet_action(&pkt_info);
 }
 
 char _license[] SEC("license") = "GPL";
