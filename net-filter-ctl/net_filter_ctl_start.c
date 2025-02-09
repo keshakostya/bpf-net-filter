@@ -23,7 +23,7 @@ int net_filter_ctl_start(struct net_filter_options *opts)
     return -1;
   }
 
-  ret = xdp_program__attach(prog, ifindex, XDP_MODE_SKB, 0);
+  ret = xdp_program__attach(prog, ifindex, XDP_MODE_NATIVE, 0);
   if (ret)
   {
     xdp_program__close(prog);

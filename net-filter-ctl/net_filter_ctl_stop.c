@@ -12,7 +12,7 @@ int net_filter_ctl_stop(struct net_filter_options *opts)
   int ifindex = 0;
   struct xdp_multiprog *mp;
   struct xdp_program *prog = NULL;
-  int mode = 0;
+  int mode = XDP_MODE_NATIVE;
   int ret;
   struct bpf_object *bpf_obj;
   char map_dir[PATH_MAX];

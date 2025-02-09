@@ -99,6 +99,32 @@ out:
   return ret;
 }
 
+int fill_dev_map(struct net_filter_options *opts)
+{
+  int i = 0, map_fd, ret = 0;
+  char *net_map = NULL;
+  int net_ids[] = {3, 4};
+
+  net_map = net_filter_construct_map_name(NET_FILTER_BASE_MAP_DIR, opts->ifname, "tx_port_map");
+  map_fd = net_filter_open_map(net_map, NULL);
+  if (map_fd < 0)
+  {
+    printf("Failed to open map\n");
+    return -1;
+  }
+
+  for (i = 0; i < 2; ++i)
+  {
+    ret = bpf_map_update_elem(map_fd, &i, &net_ids[i], 0);
+    if (ret < 0)
+      goto out;
+  }
+
+out:
+  close(map_fd);
+  return ret;
+}
+
 int main(int argc, char **argv)
 {
   struct net_filter_ace acl[16] = {0};
@@ -138,5 +164,12 @@ int main(int argc, char **argv)
     printf("Fail to fill map with rules\n");
     return 1;
   }
+
+  // ret = fill_dev_map(&opts);
+  // if (ret)
+  // {
+  //   printf("Fail to fill map with net ids\n");
+  //   return 1;
+  // }
   return 0;
 }
